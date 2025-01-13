@@ -25,7 +25,8 @@ link_dict = {'league': ['https://www.riotgames.com/en/news', 1],
     'mtg': ['https://magic.wizards.com/en/news', 3],
     'wow': ['https://worldofwarcraft.blizzard.com/en-us/news', 4],
     'pokemon': ['https://www.pokemon.com/us/pokemon-news' , 5],
-    'brighter_shores': ['https://brightershores.pro/category/news', 6]}
+    'brighter_shores': ['https://brightershores.pro/category/news', 6],
+    'poe': ['https://www.pathofexile.com/news', 7]}
 
 
 async def wait_until(target_time):
