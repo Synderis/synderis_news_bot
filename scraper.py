@@ -1,7 +1,7 @@
 import bs4
 import requests
 import pandas as pd
-import datetime
+from datetime import datetime
 
 def scrape_news(url):
     response = requests.get(url)
@@ -29,91 +29,115 @@ def get_news(tag, url):
         get_pokemon_news(url)
     elif tag == 'brighter_shores':
         get_brighter_shores_news(url)
+    elif tag == 'poe':
+        get_poe_news(url)
     else:
         return None
 
 def get_league_news(url):
     soup = scrape_news(url)
     news = []
-    for article in soup.find_all('div', class_='summary'):
-        date = convert_date(article.find('time', class_='summary__date').text.strip())
-        if date == datetime.datetime.now().strftime('%m/%d/%Y'):
-            title = article.find('span', class_='is-vhidden').text
-            description = article.find('div', class_='summary__sell copy copy--muted').text
-            link = article.find('a')['href']
+    articles = soup.find_all('div', class_='summary')
+    i = 0
+
+    while i < len(articles):
+        date = convert_date(articles[i].find('time', class_='summary__date').text.strip()).date()
+        if date == datetime.now().date():
+            link = articles[i].find('a')['href']
             news.append(link)
+            i += 1
+        else:
+            break
     return news
 
 def get_mtg_news(url):
     soup = scrape_news(url)
     news = []
-    articles = soup.find_all('article')
+    articles = soup.find('articles-hub').find_all('a', attrs={"data-navigation-type": "news", "data-link-type": "router"})
     i = 0
     while i < len(articles):
-        link = articles[i].find('a', attrs={"data-navigation-type": "news", "data-link-type": "router"})['href']
+        link = articles[i]['href']
         current_article_soup = scrape_news(link)
-        date = convert_date(current_article_soup.find('time').text.strip())
-        if date == datetime.datetime.now().strftime('%m/%d/%Y'):
+        date = convert_date(current_article_soup.find('time').text.strip()).date()
+        if date == datetime.now().date():
             news.append(link)
             i += 1
-        elif date < datetime.datetime.now().strftime('%m/%d/%Y'):
-            break
         else:
-            i += 1
+            break
     return news
 
 def get_osrs_news(url):
     soup = scrape_news(url)
     news = []
-    articles = soup.find_all('article')
-    for article in articles:
-        date = convert_date(article.find('time').text.strip())
-        if date == datetime.datetime.now().strftime('%m/%d/%Y'):
-            news.append(article.find('a')['href'])
+    articles = soup.find_all('news-list-article')
+    i = 0
+    while i < len(articles):
+        date = convert_date(articles[i].find('time').text.strip()).date()
+        if date == datetime.now().date():
+            news.append(articles[i].find('a')['href'])
+            i += 1
+        else:
+            break
     return news
 
 def get_wow_news(url):
     soup = scrape_news(url)
     news = []
-    articles = soup.find_all('div', class_='List List--vertical List--separatorAll List--full').find_all('List-item')
-    for article in articles:
-        date = article.find('time').text
+    articles = soup.find_all('List-item')
+    i = 0
+    while i < len(articles):
+        date = articles[i].find('time').text
         if 'Today' in date:
-            news.append(article.find('a')['href'])
+            news.append(articles[i].find('a')['href'])
+            i += 1
+        else:
+            break
     return news
 
 def get_pokemon_news(url):
     soup = scrape_news(url)
     news = []
-    articles = soup.find_all('div', class_='news-list').find_all('a')
-    for article in articles:
-        date = convert_date(article.find('p', class_='date').text.strip())
-        if date == datetime.datetime.now().strftime('%m/%d/%Y'):
-            news.append(article['href'])
+    articles = soup.find('div', class_='news-list').find_all('a')
+    i = 0
+    while i < len(articles):
+        date = convert_date(articles[i].find('p', class_='date').text.strip()).date()
+        if date == datetime.now().date():
+            news.append(articles[i]['href'])
+            i += 1
+        else:
+            break
     return news
 
 def get_brighter_shores_news(url):
     soup = scrape_news(url)
     news = []
     articles = soup.find_all('div', class_='col-md-4 mb-4')
-    for article in articles:
-        date = article.find('time').text
+    i = 0
+    while i < len(articles):
+        date = articles[i].find('time').text
         if 'Today' in date:
-            news.append(article.find('a')['href'])
+            news.append(articles[i].find('a')['href'])
+            i += 1
+        else:
+            break
     return news
 
 def get_poe_news(url):
     soup = scrape_news(url)
     news = []
-    articles = soup.find_all('div', class_='newsList').find_all('div', class_=['newsListItem', 'newsListItem alt'])
-    for article in articles:
-        date_str = article.find('div', class_='date').text
+    articles = soup.find_all('div', class_=['newsListItem', 'newsListItem alt'])
+    i = 0
+    while i < len(articles):
+        date_str = articles[i].find('div', class_='date').text
         parts = date_str.split(',', 2)
         date_part = parts[0] + ',' + parts[1]
-        date = convert_date(date_part)
-        if date == datetime.datetime.now().strftime('%m/%d/%Y'):
-            link_set = list(set(article.find_all('a')['href']))
+        date = convert_date(date_part).date()
+        if date == datetime.now().date():
+            link_set = list(set(articles[i].find_all('a')['href']))
             news.append(link_set[0])
+            i += 1
+        else:
+            break
     return news
 
 
