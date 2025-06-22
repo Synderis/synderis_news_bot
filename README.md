@@ -5,14 +5,14 @@ Synderis News Bot is a Discord bot that scrapes various news articles and posts 
 ## Features
 
 - Scrapes news articles from various sources.
-- Posts news articles to specified Discord channels daily at a set time.
+- Reads the last 50 messages to see if the news article has already been posted.
+- Posts news articles to specified Discord channels if the article was created today.
 - Easy to configure and extend.
 
 ## Requirements
 
-- Python 3.8+
-- `discord.py` library
-- `python-dotenv` library
+- Python 3.12
+- Discord Token and Channel Mapping in AWS Secrets Manager
 
 ## Installation
 
@@ -27,13 +27,6 @@ Synderis News Bot is a Discord bot that scrapes various news articles and posts 
     pip install -r requirements.txt
     ```
 
-3. Create a `.env` file in the root directory and add your Discord bot token:
-    ```env
-    DISCORD_TOKEN=your_bot_token_here
-    ```
-
-4. Update the `CHANNEL_ID` in `main.py` with the ID of the channel you want the bot to post in.
-
 ## Usage
 
 Run the bot:
@@ -41,13 +34,7 @@ Run the bot:
 python main.py
 ```
 
-The bot will post a daily message at the specified time in the specified channel.
-
-## Configuration
-
-- **BOT_TOKEN**: Your Discord bot token. Set this in the `.env` file.
-- **CHANNEL_ID**: The ID of the Discord channel where the bot will post messages.
-- **POST_TIME**: The time of day when the bot will post the message (24-hour format).
+The bot will post a message if it finds an article posted that day if it isn't found in the last 50 messages of the channel.
 
 ## Contributing
 

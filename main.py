@@ -1,69 +1,97 @@
-import discord
-import asyncio
-from discord.ext import commands, tasks
-from datetime import datetime, time, timedelta
-import os
-
+import requests
 import scraper
+import boto3
+import json
 
-from dotenv import load_dotenv
+def get_secret(secret_name, region_name="us-east-2"):
+    session = boto3.session.Session()
+    client = session.client(service_name='secretsmanager', region_name=region_name)
+    get_secret_value_response = client.get_secret_value(SecretId=secret_name)
+    secret = get_secret_value_response['SecretString']
+    return json.loads(secret)
 
-load_dotenv()
-TOKEN = os.getenv('DISCORD_TOKEN')
+# Load secrets from AWS Secrets Manager
+secrets = get_secret('synderis-news-bot')
+discord_token = secrets.get('discord_token')
+discord_channels = secrets.get('discord_channels')
 
-# Replace 'CHANNEL_ID' with the ID of the channel you want the bot to post in
-CHANNEL_ID = 123456789012345678  # Replace with your channel ID
-# Set the specific time you want the bot to post (24-hour format: HH:MM)
-POST_TIME = time(12, 0)  # Example: 12:00 PM
+link_dict = {
+    'league': ['https://www.riotgames.com/en/news'],
+    'osrs': ['https://secure.runescape.com/m=news/archive?oldschool=1'],
+    'mtg': ['https://magic.wizards.com/en/news'],
+    'wow': ['https://worldofwarcraft.blizzard.com/en-us/news'],
+    'brighter_shores': ['https://brightershores.pro/category/news']
+}
 
-# Initialize the bot
-intents = discord.Intents.default()
-bot = commands.Bot(command_prefix='!', intents=intents)
+def parse_channels(channels_env):
+    mapping = {}
+    for entry in channels_env.split(','):
+        if ':' in entry:
+            tag, chan_id = entry.split(':', 1)
+            mapping[tag.strip()] = int(chan_id.strip())
+    return mapping
 
-link_dict = {'league': ['https://www.riotgames.com/en/news', 1],
-    'osrs': ['https://secure.runescape.com/m=news/archive?oldschool=1', 2],
-    'mtg': ['https://magic.wizards.com/en/news', 3],
-    'wow': ['https://worldofwarcraft.blizzard.com/en-us/news', 4],
-    'pokemon': ['https://www.pokemon.com/us/pokemon-news' , 5],
-    'brighter_shores': ['https://brightershores.pro/category/news', 6]}
+def send_discord_message(channel_id, content):
+    url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
+    headers = {
+        "Authorization": f"Bot {discord_token}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "content": content
+    }
+    response = requests.post(url, headers=headers, json=data)
+    print(f"Sending message to channel {channel_id}: {content}")
+    print(f"Response status code: {response.status_code}")
+    if response.status_code != 200 and response.status_code != 204:
+        print(f"Discord API error response: {response.text}")
+    return response.status_code == 200 or response.status_code == 204
 
+def check_discord_messages(channel_id, news_list):
+    url = f"https://discord.com/api/v10/channels/{channel_id}/messages?limit=100"
+    headers = {
+        "Authorization": f"Bot {discord_token}",
+        "Content-Type": "application/json"
+    }
+    response = requests.get(url, headers=headers)
+    if response.status_code != 200:
+        print(f"Failed to fetch messages: {response.status_code} {response.text}")
+        return None
+    messages = response.json()
+    existing_urls = set()
+    for msg in messages:
+        # Check message content
+        if msg.get("content") in news_list:
+            existing_urls.add(msg.get("content"))
+        # Check embeds for url field
+        for embed in msg.get("embeds", []):
+            embed_url = embed.get("url")
+            if embed_url in news_list:
+                existing_urls.add(embed_url)
+    # Return only URLs that have NOT been posted yet
+    return [url for url in news_list if url not in existing_urls]
 
-async def wait_until(target_time):
-    now = datetime.now()
-    target_datetime = datetime.combine(now.date(), target_time)
-    if now.time() > target_time:
-        target_datetime += timedelta(days=1)  # Schedule for the next day
-    wait_seconds = (target_datetime - now).total_seconds()
-    await asyncio.sleep(wait_seconds)
-
-async def send_daily_message():
-    await bot.wait_until_ready()
-    while not bot.is_closed():
-        await wait_until(POST_TIME)
-        channel = bot.get_channel(CHANNEL_ID)
-        if channel:
-            await channel.send("Good day! Here's your daily message.")
-        await asyncio.sleep(24 * 60 * 60)  # Wait for a day
-
-async def deliver_daily_news():
-    await bot.wait_until_ready()
-    while not bot.is_closed():
-        await wait_until(POST_TIME)
-        for key, value in link_dict.items():
-            channel = bot.get_channel(value[1])
-            news = await scraper.get_news(key,value[0])
-            if news:
-                for item in news:
-                    await channel.send(item)
-        await asyncio.sleep(24 * 60 * 60)
-
-@bot.event
-async def on_ready():
-    print(f'Logged in as {bot.user} (ID: {bot.user.id})')
-    print('------')
-
-# Start the background task
-bot.loop.create_task(send_daily_message())
-
-# Run the bot
-bot.run(TOKEN)
+def lambda_handler(event, context):
+    print("Starting news scraper...")
+    channel_map = parse_channels(discord_channels)
+    print(f"Channel mapping: {channel_map}")
+    for key, value in link_dict.items():
+        channel_id = channel_map.get(key)
+        print(f"Processing {key} with URL {value[0]} and channel ID {channel_id}")
+        exit(0)
+        if not channel_id:
+            print(f"No channel ID found for {key}, skipping.")
+            continue
+        news = scraper.get_news(key, value[0])
+        if news:
+            print(f'Got news: {news}')
+            # Only get new URLs that haven't been posted yet
+            new_urls = check_discord_messages(channel_id, news)
+            if not new_urls:
+                print(f"No new news items found for {key}.")
+                continue
+            for item in new_urls:
+                print(f"Found new news item: {item}")
+                send_discord_message(channel_id, item)
+                print(f"Sent news item to channel {channel_id}: {item}")
+    return {"status": "done"}
