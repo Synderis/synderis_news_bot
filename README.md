@@ -18,7 +18,7 @@ Synderis News Bot is a Discord bot that scrapes various news articles and posts 
 
 1. Clone the repository:
     ```sh
-    git clone https://github.com/yourusername/synderis_news_bot.git
+    git clone https://github.com/Synderis/synderis_news_bot.git
     cd synderis_news_bot
     ```
 
